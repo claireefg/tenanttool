@@ -4,6 +4,8 @@ import geopandas as gpd
 import pandas as pd
 import re
 
+landlord_info = pd.read_pickle('landlord_info.pkl')
+
 def standardize_address(address):
     """Standardizes an address for use in Google Maps."""
     address = re.sub(r'\s+', ' ', address).strip()
@@ -153,12 +155,32 @@ def display_addresses_on_map_for_web(addresses):
     Loads the given addresses on a Folium map for the web application.
     """
     if addresses:
-        # ... (your existing map creation logic, similar to the Jupyter version) ...
-        # ... but without the 'display(m)' at the end ...
-    else:
-        # ... (your existing map creation logic for the default map) ...
-        # ... but without the 'display(m)' at the end ...
+        center_location = gdf[gdf['UNIT_ADDRESS_GMAPS'] == addresses[0]]['geometry'].iloc[0]
+        # Convert center_location to EPSG:4326 for Folium
+        # Create a GeoSeries to apply to_crs
+        center_location_geoseries = gpd.GeoSeries(center_location, crs=gdf.crs)  
+        center_location_4326 = center_location_geoseries.to_crs("EPSG:4326").iloc[0]  # Get the Point
+        m = folium.Map(location=[center_location_4326.y, center_location_4326.x], zoom_start=13)
 
+        for address in addresses:
+            geometry = gdf[gdf['UNIT_ADDRESS_GMAPS'] == address]['geometry'].iloc[0]
+            # Convert geometry to EPSG:4326 for Folium
+            # Create a GeoSeries to apply to_crs
+            geometry_geoseries = gpd.GeoSeries(geometry, crs=gdf.crs) 
+            geometry_4326 = geometry_geoseries.to_crs("EPSG:4326").iloc[0]  # Get the Point
+            html = f"""
+                <b>Address:</b> {address}<br>
+            """
+            iframe = folium.IFrame(html, width=200, height=50)
+            popup = folium.Popup(iframe, max_width=2650)
+            folium.Marker(
+                location=[geometry_4326.y, geometry_4326.x],  # Use converted coordinates
+                popup=popup,
+                icon=folium.Icon(color='blue')
+            ).add_to(m)
+    else:
+        # Default to Boston if no addresses are provided
+        m = folium.Map(location=[42.3601, -71.0589], zoom_start=10) 
     return m  # Return the Folium map object
 
 
